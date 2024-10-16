@@ -1,14 +1,26 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, Keyboard } from 'react-native';
-import MapView from 'react-native-maps';
-import apiViaCep from './src/services/apiViaCep';
-import apiMaps from './src/services/apiMaps';
-import { MAPS_API_KEY } from '@env';
+import MapView, { Marker } from 'react-native-maps';
+import api from './src/services/api';
 
 export default function App() {
 
-  const [cep, setCep] = useState('69060660');
+  const INITIAL_REGION = {
+    latitude: -8.06819,
+    longitude: -56.21783,
+    latitudeDelta: 15,
+    longitudeDelta: 15
+  };
+
+  const [cep, setCep] = useState('');
   const [result, setResult] = useState(null);
+  const [marker, setMarker] = useState(null);
+
+  const map = useRef();
+
+  useEffect(() => {
+    map.current?.animateToRegion(!marker ? INITIAL_REGION : marker);
+  }, [marker]);
 
   async function buscarCep() {
     if (!cep.trim().length || cep.length != 8) {
@@ -20,7 +32,7 @@ export default function App() {
       return;
     }
 
-    const response = await apiViaCep.get(`${cep}/json`);
+    const response = await api.get(`${cep}`);
 
     if (response.data.erro) {
       alert('CEP não encontrado!');
@@ -28,22 +40,12 @@ export default function App() {
     }
 
     setResult(response.data);
-
-    // const mapsResponse = await apiMaps.post('', {
-    //   textQuery: `${response.data.logradouro}, ${response.data.bairro}, ${response.data.cep} ${response.data.localidade} - ${response.data.uf}`
-    // }, {
-    //   headers: {
-    //     'X-Goog-Api-Key': MAPS_API_KEY
-    //   }
-    // });
-
-    // console.log(mapsResponse.data);
-    // if (mapsResponse.data && mapsResponse.data.places && mapsResponse.data.places.length > 0) {
-    //   console.log(mapsResponse.data);
-    //   if (mapsResponse.data.places[0].location) {
-    //     console.log(mapsResponse.data.places[0].location);
-    //   }
-    // }
+    setMarker({
+      latitude: parseFloat(response.data.lat),
+      longitude: parseFloat(response.data.lng),
+      latitudeDelta: 0.01,
+      longitudeDelta: 0.01,
+    });
 
     Keyboard.dismiss();
   }
@@ -51,6 +53,7 @@ export default function App() {
   function limpar() {
     setCep('');
     setResult(null);
+    setMarker(null);
   }
 
   return (
@@ -58,7 +61,12 @@ export default function App() {
 
       <MapView
         style={styles.map}
+        initialRegion={INITIAL_REGION}
+        ref={map}
       >
+        {marker != null && (
+          <Marker key={1} coordinate={marker} />
+        )}
       </MapView>
 
       <View style={styles.container}>
@@ -86,7 +94,7 @@ export default function App() {
         </View>
         {result !== null && (
           <Text style={styles.textResult}>
-            {result.logradouro}, {result.bairro}, {result.cep} {result.localidade} - {result.uf}
+            {result.address_type} {result.address_name}, {result.district}, {result.cep} {result.city} - {result.state}
           </Text>
         )}
       </View>
